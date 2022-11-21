@@ -1,78 +1,45 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 from gc import callbacks
 import json
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, BartConfig
-from transformers import Seq2SeqTrainingArguments, EarlyStoppingCallback
+import sys
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, EarlyStoppingCallback
 from transformers import BartModel, BartForConditionalGeneration
 from transformers import BartTokenizerFast
-import datasets
+from transformers import Seq2SeqTrainingArguments
+from transformers import DataCollatorForSeq2Seq
+
 from datasets import load_dataset, load_from_disk, DatasetDict, Dataset, ReadInstruction
-from tokenizers import Tokenizer
 from datasets import load_metric
 
 
-import numpy as np
-import pandas as pd
-import random
-
-
-# In[2]:
-
-
-dataset = load_dataset("json", data_files={"train":"train_medium.jsonl", "validation" : "val.jsonl"})
-
-
-# In[3]:
-
-
-# In[4]:
-
+# Loading training dataset.
+dataset = load_dataset("json", data_files={"train":"train_"+ sys.argv[1] +".jsonl", "validation" : "val.jsonl"})
 
 def join_keyphrases(dataset):
     dataset["keyphrases"] = " <KP> ".join(dataset["keyphrases"])
     return dataset
 
-
-# In[5]:
-
-
-
-# In[6]:
-
-
-#dataset = dataset.map(tokenize_keyphrases)
+# Making the references sequences
 dataset = dataset.map(join_keyphrases,num_proc=8,desc="Putting all keyphrases in a single sequence separated by <KP>")
 
+# Loading the model
+tokenizer = BartTokenizerFast.from_pretrained("GanjinZero/biobart-base")
 
-
-
-# In[9]:
-
-
-tokenizer = BartTokenizerFast.from_pretrained("facebook/bart-base")
-print(tokenizer.all_special_tokens)
 
 # ----------------- FOR SPECIAL TOKENS -----------------------
 special_token = {"additional_special_tokens":['<KP>']}
 num_added_toks = tokenizer.add_special_tokens(special_token) ##This line is updated
 #-------------------------------------------------------------
+print(tokenizer.all_special_tokens)
 
-# In[10]:
-
-
+# Getting the text from the title and the abstract
 def get_text(dataset):
     dataset["text"] = dataset["title"] + ". " + dataset["abstract"]
     return dataset
 
-
-# In[11]:
-
-
+# Function to tokenize the text using Huggingface tokenizer
 def preprocess_function(dataset):
 
     model_inputs = tokenizer(
@@ -90,47 +57,22 @@ def preprocess_function(dataset):
     
 
 
-# In[12]:
-
-
-#tokenized_datasets = DatasetDict()
 dataset = dataset.map(get_text,num_proc=10, desc="Getting full text (title+abstract)")
-
-
-# In[13]:
-
-
-#dataset
-#tokenized_datasets["train"]= dataset["test"].map(preprocess_function,batched=True)
-#dataset["train"].keys()
 
 tokenized_datasets= dataset.map(preprocess_function, batched=True, num_proc = 10, desc="Running tokenizer on dataset")
 
-tokenized_datasets.save_to_disk("tokenized_dataset")
-
-# In[15]:
-
-
 tokenized_datasets.set_format("torch")
 
-
-# In[16]:
-
-
-from transformers import Seq2SeqTrainingArguments
-
-
-# In[17]:
-
-
+# Training arguments
+#--------------------------------------------------------------------------------------------
 batch_size = 12
-num_train_epochs = 10
+num_train_epochs = 5
 # Show the training loss with every epoch
 logging_steps = len(tokenized_datasets["train"]) // batch_size
-model_name = "fine-tuning"#model_checkpoint.split("/")[-1]
+model_name = "fine-tuning"
 
 args = Seq2SeqTrainingArguments(
-    output_dir=f"{model_name}-kpmed",
+    output_dir=f"{model_name}-biobart_medium",
     save_strategy="epoch",
     evaluation_strategy="epoch",
     learning_rate=5e-5,
@@ -141,36 +83,19 @@ args = Seq2SeqTrainingArguments(
     num_train_epochs=num_train_epochs,
     logging_steps=logging_steps,
     push_to_hub=False,
-    load_best_model_at_end=True
+    #load_best_model_at_end=True
 )
+#-------------------------------------------------------------------------------------------
 
-
-# In[18]:
-
-# In[20]:
-
-
-from transformers.data.data_collator import DataCollator
-from transformers import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling, DataCollatorWithPadding
-
-model = BartForConditionalGeneration.from_pretrained("facebook/bart-base")
-model.resize_token_embeddings(len(tokenizer)) #because we added the <KP> token
+model = BartForConditionalGeneration.from_pretrained("GanjinZero/biobart-base")
+model.resize_token_embeddings(len(tokenizer)) #because we added the <KP> token so we need to update the vocab size
 
 data_collator = DataCollatorForSeq2Seq(tokenizer, model)
-
-
-# In[21]:
 
 
 tokenized_datasets = tokenized_datasets.remove_columns(
     dataset["train"].column_names
 )
-
-
-# In[22]:
-
-
-from transformers import Seq2SeqTrainer
 
 trainer = Seq2SeqTrainer(
     model,
@@ -185,9 +110,6 @@ trainer = Seq2SeqTrainer(
 )
 
 
-# In[ ]:
-
-
 trainer.train()
-trainer.save_model("final_model")
+trainer.save_model("fine-tuning-biobart_" + sys.argv[1] +"/final_model")
 

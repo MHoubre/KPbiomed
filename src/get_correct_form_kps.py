@@ -1,42 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[5]:
 
 
 from datasets import load_dataset
-import sys
-
-dataset = load_dataset("json",data_files=sys.argv[1])
-
-
-# In[3]:
-
-
 from tqdm.notebook import tqdm
-
-P, R, M, U, nb_kps = [], [], [], [], []
-
-for split in ['train']:
-    
-    for sample in tqdm(dataset[split]):
-        nb_kps.append(len(sample["keyphrases"]))
-        P.append(sample["prmu"].count("P") / nb_kps[-1])
-        R.append(sample["prmu"].count("R") / nb_kps[-1])
-        M.append(sample["prmu"].count("M") / nb_kps[-1])
-        U.append(sample["prmu"].count("U") / nb_kps[-1])
-        
-print("# keyphrases: {:.2f}".format(sum(nb_kps)/len(nb_kps)))
-print("% P: {:.2f}".format(sum(P)/len(P)*100))
-print("% R: {:.2f}".format(sum(R)/len(R)*100))
-print("% M: {:.2f}".format(sum(M)/len(M)*100))
-print("% U: {:.2f}".format(sum(U)/len(U)*100))
-
-
-# In[4]:
-
-
+from collections import Counter, OrderedDict
+import matplotlib.pyplot as plt
 import spacy
+import sys
+import json
 
 nlp = spacy.load("en_core_web_sm",disable=['tagger','parser','ner','lemmatizer','textcat'])
 
@@ -65,19 +39,23 @@ infixes = (
 infix_re = compile_infix_regex(infixes)
 nlp.tokenizer.infix_finditer = infix_re.finditer
 
-
-# In[ ]:
-
-
-doc_len = []
-for split in ['train']:
-    for sample in tqdm(dataset[split]):
-        doc_len.append(len(nlp(sample["abstract"])))
-print("avg doc len: {:.1f}".format(sum(doc_len)/len(doc_len)))
+d = load_dataset("json",data_files="{}.jsonl".format(sys.argv[1]))
 
 
-# In[ ]:
+def get_incorrect_kp(dataset):
+    nb=0
+    for kp in dataset["keyphrases"]:
+        d = nlp(kp) #Tokenize the text using spacy tokenizer
+        if "," in d.text: # If we have comas in the keyphrases
+            nb+=1
+    dataset["incorrect_kps"] = nb
+    return dataset
+            
+d = d.map(get_incorrect_kp,num_proc=10)
 
+d = d.filter(lambda example: example["incorrect_kps"]==0) # We remove any document that has keyphrases with comas in it
 
+d = d.remove_columns("incorrect_kps")
 
+d["train"].to_json("{}_correct_form.json".format(sys.argv[1]))
 

@@ -44,7 +44,9 @@ nlp.tokenizer.infix_finditer = infix_re.finditer
 
 # In[5]:
 
-
+"""
+Function that returns if a subseq is in the inseq
+"""
 def contains(subseq, inseq):
     return any(inseq[pos:pos + len(subseq)] == subseq for pos in range(0, len(inseq) - len(subseq) + 1))
 
@@ -90,28 +92,30 @@ def get_present_order(dataset):
     for element in dataset["presents"]:
         position.append(contains_with_pos(element, dataset["tok_text"]))
         #print(position)
-    dataset["ordered_present_kp"] = position
+    dataset["ordered_present_offset"] = position
     return dataset
 
 """
-Function that orders the present keyphrases by their offset
+Function that orders the present stemmed keyphrases by their offset
 returns a dataset with a "ordered_present_kp" column
 """
 def reorder_present_kp(dataset):
     if "P" not in dataset["prmu"]:
         cop=[]
     else:
-        cop = [x for _, x in sorted(zip(dataset["ordered_present_kp"], dataset["presents"])
+        cop = [x for _, x in sorted(zip(dataset["ordered_present_offset"], dataset["presents"])
                                     , key=lambda pair: pair[0])]
     dataset["ordered_presents"] = cop
     return dataset
 
-
+"""
+Function that orders the present keyphrases and their prmu
+"""
 def reorder_kp(dataset):
     reordered_kp=[]
     reordered_prmu=[]
     for stem_kp in dataset["ordered_presents"]:
-        #print(stem_kp)
+
         index = dataset["tokenized_keyphrases"].index(stem_kp)
         reordered_kp.append(dataset["keyphrases"][index])
         reordered_prmu.append(dataset["prmu"][index])
@@ -131,7 +135,7 @@ def add_absent_kp(dataset):
     return dataset
     
 
-def find_pmru(tok_title, tok_text, tok_kp):
+def find_prmu(tok_title, tok_text, tok_kp):
     """Find PRMU category of a given keyphrase."""
 
     # if kp is present
@@ -155,7 +159,7 @@ def find_pmru(tok_title, tok_text, tok_kp):
             return "U"
     return prmu
 
-def tokenize(dataset):
+def tokenize_and_stemm_keyphrases(dataset):
     keyphrases_stems= []
     for keyphrase in dataset["keyphrases"]:
         keyphrase_spacy = nlp(keyphrase)
@@ -166,7 +170,7 @@ def tokenize(dataset):
     dataset["tokenized_keyphrases"] = keyphrases_stems
     return dataset
 
-def tokenize_text(dataset):
+def tokenize_and_stemm_text(dataset):
     title_spacy = nlp(dataset['title'])
     abstract_spacy = nlp(dataset['abstract'])
 
@@ -190,7 +194,7 @@ def prmu_dataset(dataset):
 
     title_stems = dataset["title_stems"]
     abstract_stems = dataset["abstract_stems"]
-    prmu = [find_pmru(title_stems, abstract_stems, kp) for kp in dataset["tokenized_keyphrases"]]
+    prmu = [find_prmu(title_stems, abstract_stems, kp) for kp in dataset["tokenized_keyphrases"]]
 
     dataset["tok_text"] = title_stems + abstract_stems
     dataset['prmu'] = prmu
@@ -203,19 +207,16 @@ def prmu_dataset(dataset):
 
 
 if __name__ == "__main__":
-    dataset = load_dataset("json",data_files="data_prmu.jsonl")
-    # print("TOKENIZATION")
-    # dataset = dataset.map(tokenize)
+    dataset = load_dataset("json",data_files="data_correct_form.jsonl")
 
-    # dataset.save_to_disk("tokenized_keyphrases")
+    print("TOKENIZATION")
+    dataset = dataset.map(tokenize_and_stemm_keyphrases) # We need to tokenize and stemm to get PRMU labels
 
-
-
-    # dataset = dataset.map(tokenize_text)
-    # dataset.save_to_disk("tokenized_text")
+    dataset = dataset.map(tokenize_and_stemm_text) # We do he same to the text for comparison
+    
 
     print("PRMU")
-    dataset = dataset.map(prmu_dataset)
+    dataset = dataset.map(prmu_dataset) # Getting the PRMU labels for each keyphrase
 
     dataset = dataset.remove_columns(["abstract_stems","title_stems"])
 
@@ -228,9 +229,7 @@ if __name__ == "__main__":
     dataset = dataset.map(get_present_order,num_proc=8)
 
     print("REORDERING")
-    dataset = dataset.map(reorder_present_kp,num_proc=8)
-
-    dataset.save_to_disk("reordered_dataset")
+    dataset = dataset.map(reorder_present_kp,num_proc=8) # Reordering the present keyphrases by their occurrence in the source text
 
     dataset = dataset.remove_columns("tok_text")
 
@@ -238,4 +237,4 @@ if __name__ == "__main__":
 
     dataset = dataset.map(add_absent_kp,num_proc=8)
 
-    dataset['train'].to_json("data_prmu_ordered.jsonl")
+    dataset['train'].to_json("data_prmu.jsonl")

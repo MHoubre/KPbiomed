@@ -1,61 +1,22 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 from datasets import load_dataset, Dataset
 import random
 from sklearn.model_selection import train_test_split
 import collections
-from numpy import savetxt
 import json
 import spacy
 
-nlp = spacy.load("en_core_web_sm",disable=['tagger','parser','ner','lemmatizer','textcat'])
-
-# https://spacy.io/usage/linguistic-features#native-tokenizer-additions
-
-from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
-from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
-from spacy.util import compile_infix_regex
-
-# Modify tokenizer infix patterns
-infixes = (
-    LIST_ELLIPSES
-    + LIST_ICONS
-    + [
-        r"(?<=[0-9])[+\-\*^](?=[0-9-])",
-        r"(?<=[{al}{q}])\.(?=[{au}{q}])".format(
-            al=ALPHA_LOWER, au=ALPHA_UPPER, q=CONCAT_QUOTES
-        ),
-        r"(?<=[{a}]),(?=[{a}])".format(a=ALPHA),
-        # ✅ Commented out regex that splits on hyphens between letters:
-        # r"(?<=[{a}])(?:{h})(?=[{a}])".format(a=ALPHA, h=HYPHENS),
-        r"(?<=[{a}0-9])[:<>=/](?=[{a}])".format(a=ALPHA),
-    ]
-)
-
-infix_re = compile_infix_regex(infixes)
-nlp.tokenizer.infix_finditer = infix_re.finditer
-
-# In[2]:
-
-data = load_dataset("json",data_files="data_correct_form.jsonl")
-
-
-# In[3]:
-
+data = load_dataset("json",data_files="data_prmu.jsonl")
 
 data = data["train"]
 
-
-# In[ ]:
 print(collections.Counter(data["year"]))
 print("\n")
 
-# In[5]:
-t_size = len(data)-40000
+
+t_size = len(data)-40000 # 40 000 because we want the test and validation sets to have 20 000 docs each
 
 x_train,x_test = train_test_split(data, train_size=t_size,stratify=data["year"],random_state=1) #Train test split
 
