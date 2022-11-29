@@ -1,0 +1,9 @@
+pubmed-parser
+transformers
+datasets
+spacy
+nltk
+numpy
+sklearn
+git+https://github.com/boudinfl/pke.git
+
