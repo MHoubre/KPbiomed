@@ -16,6 +16,6 @@ def to_int(dataset):
 data = data.map(to_int,num_proc=9)
 
 data = data.filter(lambda example: example['year']>=2011,num_proc=9)
-data.to_json("kpmed_10y.jsonl")
+data.to_json("data.jsonl")
 
 print(data.num_rows)

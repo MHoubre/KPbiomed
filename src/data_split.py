@@ -32,14 +32,11 @@ del(x_test)
 test_dataset = Dataset.from_dict(test) 
 val_dataset = Dataset.from_dict(val)
 
-with open("/home/houbre/train_large.json","w") as output:
-    for line in train_dataset:
-        json.dump(line,output)
-        output.write("\n")
+train_dataset.to_json("train_large.jsonl",num_proc=5) # Getting the large split training dataset
 
 
-test_dataset.to_json("/home/houbre/test.jsonl",num_proc=5)
-val_dataset.to_json("/home/houbre/val.jsonl",num_proc=5)
+test_dataset.to_json("test.jsonl",num_proc=5) # Getting the test set
+val_dataset.to_json("val.jsonl",num_proc=5) # Getting the validation set
 
 del(test_dataset)
 del(val_dataset)
@@ -50,10 +47,7 @@ train_medium, _ = train_test_split(train_dataset, train_size=2000000,stratify=tr
 
 medium_dataset = Dataset.from_dict(train_medium)
 
-with open("/home/houbre/train_medium.json","w") as output2:
-    for line in medium_dataset:
-        json.dump(line,output2)
-        output2.write("\n")
+medium_dataset.to_json("train_medium.jsonl",num_proc=5)
 
 print(collections.Counter(medium_dataset["year"]))
 print("\n")
@@ -67,4 +61,4 @@ small_dataset = Dataset.from_dict(train_small)
 print(collections.Counter(small_dataset["year"]))
 print("\n")
 
-small_dataset.to_json("/home/houbre/train_small.jsonl",num_proc=5)
+small_dataset.to_json("train_small.jsonl",num_proc=5)
