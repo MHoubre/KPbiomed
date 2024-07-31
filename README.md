@@ -4,7 +4,7 @@ This is the repository with the code of the paper Maël Houbre, Florian Boudin, 
 
 ## Data preprocessing
 
-First, download the 2021 PubMed/Medline baseline at: https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/
+First, download the 2021 PubMed/Medline baseline currently available at: https://lhncbc.nlm.nih.gov/ii/information/MBR/Baselines/2021.html
 
 and put it in a directory named "baseline".
 
